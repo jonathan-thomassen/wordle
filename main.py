@@ -5,17 +5,12 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from random import randrange
-import csv
 import sys
+
 
 @dataclass
 class Config:
     list_path: Path
-
-
-@dataclass
-class Entry:
-    word: str
 
 
 class Status(Enum):
@@ -23,6 +18,9 @@ class Status(Enum):
     INCORRECT = 1
     WRONG_PLACE = 2
     CORRECT = 3
+
+
+dictionary: list[str]
 
 
 def read_args() -> Config:
@@ -33,31 +31,37 @@ def read_args() -> Config:
         print("Error: First argument must be the path to a list of English words.")
 
 
-def read_list(config: Config) -> list[Entry]:
-    entries: list[Entry] = []
+def read_list(config: Config) -> list[str]:
     words: list[str]
     with open(config.list_path, encoding="utf-8") as list_file:
-        words = [line for line in list_file]
-    for word in words:
-        entry = Entry(word)
-        entries.append(entry)
-    return entries
+        words = [line.strip() for line in list_file]
+    return words
+
+
+def check_dictionary(guess: str) -> bool:
+    if guess in dictionary:
+        return True
+    return False
 
 
 def guess_validation(guess: str) -> bool:
-    isvalid = True
+    if guess == "igiveup":
+        return True
 
-    if (len(guess) > 5):
+    if len(guess) > 5:
         print("Length of word is too long, word must be five letters.")
-        isvalid = False
-    if (len(guess) < 5):
+        return False
+    if len(guess) < 5:
         print("Length of word is too short, word must be five letters.")
-        isvalid = False
-    if (not guess.isalpha()):
-        print("Guess contains non-alphabet characters. Word only contains characters in the English alphabet.")
-        isvalid = False
-
-    return isvalid
+        return False
+    if not guess.isalpha():
+        print("Word contains non-alphabet characters. Word should only contain characters in the English alphabet.")
+        return False
+    if not check_dictionary(guess):
+        print("Word is not in dictionary. Please input a valid English word.")
+        return False
+    
+    return True
 
 
 def test_guess(guess: str, word: str):
@@ -76,9 +80,9 @@ def test_guess(guess: str, word: str):
     return statuses, correct_letters
 
 
-def print_result(statusarray, correct_letters, guess):
+def print_result(statuses, correct_letters, guess):
     i = 0    
-    for status in statusarray:
+    for status in statuses:
         print(guess[i] + " is " + str(status))
         i += 1
 
@@ -88,12 +92,15 @@ def print_result(statusarray, correct_letters, guess):
 
 def process_guess(word: str, guess_no: int) -> int:
     print("Guess #" + str(guess_no) + ":")
-    guess = input()
+    guess = input().lower()
 
     while not guess_validation(guess):
         print("Guess #" + str(guess_no) + ":")
         guess = input()
 
+    if guess == "igiveup":
+        return 5
+    
     statusarray, correct_letters = test_guess(guess, word)
 
     print_result(statusarray, correct_letters, guess)
@@ -102,10 +109,11 @@ def process_guess(word: str, guess_no: int) -> int:
 
 
 def run_game(config: Config):
-    entries = read_list(config)
+    global dictionary 
+    dictionary = read_list(config)
 
-    word_number = randrange((len(entries) - 1))
-    word = entries[word_number].word
+    word_number = randrange((len(dictionary) - 1))
+    word = dictionary[word_number]
 
     for i in range(5):
         correct_letters = process_guess(word, i+1)
@@ -132,8 +140,7 @@ def main():
                     exit()
                 else:
                     print("Invalid input. Try again.")
-                
-                    
+
 
 if __name__ == "__main__":
     main()
