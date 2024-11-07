@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from random import randrange
+from tkinter import *
 import sys
+import tkinter
 
 
 @dataclass
@@ -20,6 +22,47 @@ class Status(Enum):
     CORRECT = 3
 
 
+class Square:
+    def __init__(self):
+        self.status = Status.NOT_TESTED
+        self.letter = ""
+    
+
+class Screen:
+    def __init__(self):
+        self.window = tkinter.Tk()
+        self.window.bind("<KeyPress>", self.onKeyPress)
+        self.grid = [[Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()]]
+        self.active_row = 0
+        self.active_column = 0
+ 
+    def onKeyPress(self, e):
+        print("Key pressed:", e.char.upper(), e.keycode)
+
+        #Check if key pressed is in English alphabet:
+        if e.keycode >= 65 and e.keycode <= 90 and self.grid[self.active_row][self.active_column].letter == "":
+            self.grid[self.active_row][self.active_column].letter = e.char.upper()
+            if self.active_column <= 3:
+                self.active_column += 1
+            draw_grid(self)
+        #Check for backspace:
+        elif e.keycode == 8:
+            if self.active_column >= 1 and self.grid[self.active_row][self.active_column].letter == "":
+                self.active_column -= 1
+            self.grid[self.active_row][self.active_column].letter = ""
+            draw_grid(self)
+        #Check for enter:
+        elif e.keycode == 13 and self.grid[self.active_row][self.active_column].letter != "":
+            self.active_column = 0
+            self.active_row += 1
+            draw_grid(self)
+
+
 dictionary: list[str]
 
 
@@ -28,7 +71,7 @@ def read_args() -> Config:
         list_path = Path(sys.argv[1])
         return Config(list_path)
     else:
-        print("Error: First argument must be the path to a list of English words.")
+        print("Error: First argument must be a valid path to a list of English words.")
 
 
 def read_list(config: Config) -> list[str]:
@@ -65,7 +108,7 @@ def guess_validation(guess: str) -> bool:
 
 
 def test_guess(guess: str, word: str):
-    statuses = [Status.NOT_TESTED, Status.NOT_TESTED, Status.NOT_TESTED, Status.NOT_TESTED, Status.NOT_TESTED]
+    statuses = [Status.NOT_TESTED] * 5
     correct_letters = 0
 
     for i in range(5):
@@ -87,7 +130,7 @@ def print_result(statuses, correct_letters, guess):
         i += 1
 
     if correct_letters == 5:
-        print("You have guessed the word. You win!")
+        print("Correct! You win!")
 
 
 def process_guess(word: str, guess_no: int) -> int:
@@ -101,9 +144,9 @@ def process_guess(word: str, guess_no: int) -> int:
     if guess == "igiveup":
         return 5
     
-    statusarray, correct_letters = test_guess(guess, word)
+    statuses, correct_letters = test_guess(guess, word)
 
-    print_result(statusarray, correct_letters, guess)
+    print_result(statuses, correct_letters, guess)
 
     return correct_letters
 
@@ -115,7 +158,7 @@ def run_game(config: Config):
     word_number = randrange((len(dictionary) - 1))
     word = dictionary[word_number]
 
-    for i in range(5):
+    for i in range(6):
         correct_letters = process_guess(word, i+1)
         if (correct_letters == 5):
             break
@@ -123,8 +166,36 @@ def run_game(config: Config):
     print("The word was: " + word)
 
 
+def draw_grid(screen):
+    text_color = "white"
+    square_size = 80
+    hor_screen_edge = 10
+    ver_screen_edge = 10
+    hor_square_margin = 10
+    ver_square_margin = 10    
+
+    for row in range(6):
+        for column in range(5):
+            square = screen.grid[row][column]
+            bg_color = "black"
+            frame = tkinter.Frame(screen.window, background=bg_color, highlightbackground="white", highlightthickness=1, width=square_size, height=square_size)
+            frame.pack_propagate(0)    
+            label = tkinter.Label(frame, bg=bg_color, fg=text_color, font=("Calibri", 24), text=square.letter)
+            label.pack(expand=True)
+            frame.place(x = column * (square_size + hor_square_margin) + hor_screen_edge, y = row * (square_size + ver_square_margin) + ver_screen_edge)
+
+
 def main():
-    config = read_args()
+    config = read_args()    
+
+    screen = Screen()
+    screen.window.title("Wordle Clone")
+    screen.window.resizable(width=False, height=False)
+    screen.window.geometry("460x550")
+    screen.window.configure(bg="black")
+    draw_grid(screen)
+
+    screen.window.mainloop()
 
     if config is not None:
         while True:
