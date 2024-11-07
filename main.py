@@ -22,6 +22,13 @@ class Status(Enum):
     CORRECT = 3
 
 
+class Validation_State(Enum):
+    TOO_LONG = 0
+    TOO_SHORT = 1
+    NOT_IN_DICTIONARY = 2
+    VALID = 3
+
+
 class Square:
     def __init__(self):
         self.status = Status.NOT_TESTED
@@ -58,12 +65,25 @@ class Screen:
             draw_grid(self)
         #Check for enter:
         elif e.keycode == 13 and self.grid[self.active_row][self.active_column].letter != "":
-            self.active_column = 0
-            self.active_row += 1
-            draw_grid(self)
+            guess: str = ""
+            for square in self.grid[self.active_row]:
+                guess += square.letter
+            validation_state = guess_validation(guess)
+            if validation_state == Validation_State.VALID:
+                statuses, correct_letter_amount = test_guess(guess, word)
+
+                i = 0
+                for square in self.grid[self.active_row]:
+                    square.status = statuses[i]
+                    i += 1
+
+                self.active_column = 0
+                self.active_row += 1
+                draw_grid(self)
 
 
 dictionary: list[str]
+word: str
 
 
 def read_args() -> Config:
@@ -82,32 +102,27 @@ def read_list(config: Config) -> list[str]:
 
 
 def check_dictionary(guess: str) -> bool:
-    if guess in dictionary:
+    if guess.lower() in dictionary:
         return True
     return False
 
 
-def guess_validation(guess: str) -> bool:
-    if guess == "igiveup":
-        return True
-
+def guess_validation(guess: str) -> Validation_State:
     if len(guess) > 5:
         print("Length of word is too long, word must be five letters.")
-        return False
+        return Validation_State.TOO_LONG
     if len(guess) < 5:
         print("Length of word is too short, word must be five letters.")
-        return False
-    if not guess.isalpha():
-        print("Word contains non-alphabet characters. Word should only contain characters in the English alphabet.")
-        return False
+        return Validation_State.TOO_SHORT
     if not check_dictionary(guess):
         print("Word is not in dictionary. Please input a valid English word.")
-        return False
+        return Validation_State.NOT_IN_DICTIONARY
     
-    return True
+    return Validation_State.VALID
 
 
-def test_guess(guess: str, word: str):
+def test_guess(guess: str, word: str) -> tuple[list[Status], int]:
+    guess = guess.lower()
     statuses = [Status.NOT_TESTED] * 5
     correct_letters = 0
 
@@ -156,37 +171,8 @@ def run_game(config: Config):
     dictionary = read_list(config)
 
     word_number = randrange((len(dictionary) - 1))
+    global word
     word = dictionary[word_number]
-
-    for i in range(6):
-        correct_letters = process_guess(word, i+1)
-        if (correct_letters == 5):
-            break
-    
-    print("The word was: " + word)
-
-
-def draw_grid(screen):
-    text_color = "white"
-    square_size = 80
-    hor_screen_edge = 10
-    ver_screen_edge = 10
-    hor_square_margin = 10
-    ver_square_margin = 10    
-
-    for row in range(6):
-        for column in range(5):
-            square = screen.grid[row][column]
-            bg_color = "black"
-            frame = tkinter.Frame(screen.window, background=bg_color, highlightbackground="white", highlightthickness=1, width=square_size, height=square_size)
-            frame.pack_propagate(0)    
-            label = tkinter.Label(frame, bg=bg_color, fg=text_color, font=("Calibri", 24), text=square.letter)
-            label.pack(expand=True)
-            frame.place(x = column * (square_size + hor_square_margin) + hor_screen_edge, y = row * (square_size + ver_square_margin) + ver_screen_edge)
-
-
-def main():
-    config = read_args()    
 
     screen = Screen()
     screen.window.title("Wordle Clone")
@@ -197,20 +183,49 @@ def main():
 
     screen.window.mainloop()
 
-    if config is not None:
-        while True:
-            run_game(config)
+    """ for i in range(6):
+        correct_letters = process_guess(word, i+1)
+        if (correct_letters == 5):
+            break """
+    
+    print("The word was: " + word)
 
-            response_valid = False
-            while not response_valid:
-                print("Would you like to play again?")
-                response = input().lower()       
-                if response == "y":
-                    response_valid = True
-                elif response == "n":
-                    exit()
-                else:
-                    print("Invalid input. Try again.")
+
+def draw_grid(screen: Screen):
+    square_size = 80
+    hor_screen_edge = 10
+    ver_screen_edge = 10
+    hor_square_margin = 10
+    ver_square_margin = 10    
+
+    for row in range(6):
+        for column in range(5):
+            square = screen.grid[row][column]
+            if square.status == Status.NOT_TESTED:
+                bg_color = "black"
+                text_color = "white"
+            elif square.status == Status.INCORRECT:
+                bg_color = "black"
+                text_color = "red"
+            elif square.status == Status.CORRECT:
+                bg_color = "black"
+                text_color = "green"
+            elif square.status == Status.WRONG_PLACE:
+                bg_color = "black"
+                text_color = "yellow"
+
+            frame = tkinter.Frame(screen.window, background=bg_color, highlightbackground=text_color, highlightthickness=1, width=square_size, height=square_size)
+            frame.pack_propagate(0)    
+            label = tkinter.Label(frame, bg=bg_color, fg=text_color, font=("Calibri", 24), text=square.letter)
+            label.pack(expand=True)
+            frame.place(x = column * (square_size + hor_square_margin) + hor_screen_edge, y = row * (square_size + ver_square_margin) + ver_screen_edge)
+
+
+def main():
+    config = read_args()
+
+    if config is not None:
+        run_game(config)
 
 
 if __name__ == "__main__":
