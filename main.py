@@ -16,10 +16,11 @@ class Config:
 
 
 class Status(Enum):
-    NOT_TESTED = 0
-    INCORRECT = 1
-    WRONG_PLACE = 2
-    CORRECT = 3
+    INACTIVE = 0
+    NOT_TESTED = 1
+    INCORRECT = 2
+    WRONG_PLACE = 3
+    CORRECT = 4
 
 
 class Validation_State(Enum):
@@ -28,11 +29,19 @@ class Validation_State(Enum):
     NOT_IN_DICTIONARY = 2
     VALID = 3
 
+class Game_State(Enum):
+    IN_GAME = 0
+    OUT_OF_GAME = 1
+
 
 class Square:
     def __init__(self):
-        self.status = Status.NOT_TESTED
+        self.status = Status.INACTIVE
         self.letter = ""
+
+
+dictionary: list[str]
+word: str
     
 
 class Screen:
@@ -45,45 +54,81 @@ class Screen:
                      [Square(), Square(), Square(), Square(), Square()],
                      [Square(), Square(), Square(), Square(), Square()],
                      [Square(), Square(), Square(), Square(), Square()]]
+        self.caption = "Welcome! Start typing to begin"
+        for square in  self.grid[0]:
+            square.status = Status.NOT_TESTED
         self.active_row = 0
         self.active_column = 0
+        self.state = Game_State.IN_GAME
  
     def onKeyPress(self, e):
         print("Key pressed:", e.char.upper(), e.keycode)
 
-        #Check if key pressed is in English alphabet:
-        if e.keycode >= 65 and e.keycode <= 90 and self.grid[self.active_row][self.active_column].letter == "":
-            self.grid[self.active_row][self.active_column].letter = e.char.upper()
-            if self.active_column <= 3:
-                self.active_column += 1
+        if self.state == Game_State.OUT_OF_GAME:
+            self.grid = [[Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()]]
+            self.caption = "Welcome! Start typing to begin"
+            for square in  self.grid[0]:
+                square.status = Status.NOT_TESTED
+            self.active_row = 0
+            self.active_column = 0
+            self.state = Game_State.IN_GAME
             draw_grid(self)
-        #Check for backspace:
-        elif e.keycode == 8:
-            if self.active_column >= 1 and self.grid[self.active_row][self.active_column].letter == "":
-                self.active_column -= 1
-            self.grid[self.active_row][self.active_column].letter = ""
-            draw_grid(self)
-        #Check for enter:
-        elif e.keycode == 13 and self.grid[self.active_row][self.active_column].letter != "":
-            guess: str = ""
-            for square in self.grid[self.active_row]:
-                guess += square.letter
-            validation_state = guess_validation(guess)
-            if validation_state == Validation_State.VALID:
-                statuses, correct_letter_amount = test_guess(guess, word)
-
-                i = 0
-                for square in self.grid[self.active_row]:
-                    square.status = statuses[i]
-                    i += 1
-
-                self.active_column = 0
-                self.active_row += 1
+        else:
+            #Check if key pressed is in English alphabet:
+            if e.keycode >= 65 and e.keycode <= 90 and self.grid[self.active_row][self.active_column].letter == "":
+                self.grid[self.active_row][self.active_column].letter = e.char.upper()
+                if self.active_column <= 3:
+                    self.active_column += 1
+                self.caption = "Guess #" + str(self.active_row + 1)
                 draw_grid(self)
+            #Check for backspace:
+            elif e.keycode == 8:
+                if self.active_column >= 1 and self.grid[self.active_row][self.active_column].letter == "":
+                    self.active_column -= 1
+                self.grid[self.active_row][self.active_column].letter = ""
+                self.caption = "Guess #" + str(self.active_row + 1)
+                draw_grid(self)
+            #Check for enter:
+            elif e.keycode == 13 and self.grid[self.active_row][self.active_column].letter != "":
+                guess: str = ""
+                for square in self.grid[self.active_row]:
+                    guess += square.letter
+                validation_state = guess_validation(guess)
+                if validation_state == Validation_State.VALID:
+                    statuses, correct_letter_amount = test_guess(guess, word)
 
+                    i = 0
+                    for square in self.grid[self.active_row]:
+                        square.status = statuses[i]
+                        i += 1
 
-dictionary: list[str]
-word: str
+                    if correct_letter_amount == 5:
+                        self.caption = "Congratulations! You won!"
+                        self.state = Game_State.OUT_OF_GAME
+                    elif self.active_row <= 4:
+                        self.active_column = 0
+                        self.active_row += 1
+
+                        for square in self.grid[self.active_row]:
+                            square.status = Status.NOT_TESTED  
+                        self.caption = "Guess #" + str(self.active_row + 1)
+                    else:
+                        self.caption = "You lost! The word was: " + word.upper()
+                        self.state = Game_State.OUT_OF_GAME
+                elif validation_state == Validation_State.NOT_IN_DICTIONARY:
+                    for square in self.grid[self.active_row]:
+                        square.letter = ""
+                        square.status = Status.NOT_TESTED
+
+                    self.active_column = 0
+
+                    self.caption = "Word is not in word list. Try another word."
+                draw_grid(self)
 
 
 def read_args() -> Config:
@@ -115,7 +160,7 @@ def guess_validation(guess: str) -> Validation_State:
         print("Length of word is too short, word must be five letters.")
         return Validation_State.TOO_SHORT
     if not check_dictionary(guess):
-        print("Word is not in dictionary. Please input a valid English word.")
+        print("Word is not in dictionary. Please try a different word.")
         return Validation_State.NOT_IN_DICTIONARY
     
     return Validation_State.VALID
@@ -177,16 +222,11 @@ def run_game(config: Config):
     screen = Screen()
     screen.window.title("Wordle Clone")
     screen.window.resizable(width=False, height=False)
-    screen.window.geometry("460x550")
+    screen.window.geometry("460x580")
     screen.window.configure(bg="black")
     draw_grid(screen)
 
     screen.window.mainloop()
-
-    """ for i in range(6):
-        correct_letters = process_guess(word, i+1)
-        if (correct_letters == 5):
-            break """
     
     print("The word was: " + word)
 
@@ -196,12 +236,18 @@ def draw_grid(screen: Screen):
     hor_screen_edge = 10
     ver_screen_edge = 10
     hor_square_margin = 10
-    ver_square_margin = 10    
+    ver_square_margin = 10
+
+    for child in screen.window.winfo_children():
+        child.destroy()
 
     for row in range(6):
         for column in range(5):
             square = screen.grid[row][column]
-            if square.status == Status.NOT_TESTED:
+            if square.status == Status.INACTIVE:
+                bg_color = "black"
+                text_color = "grey"
+            elif square.status == Status.NOT_TESTED:
                 bg_color = "black"
                 text_color = "white"
             elif square.status == Status.INCORRECT:
@@ -215,10 +261,16 @@ def draw_grid(screen: Screen):
                 text_color = "yellow"
 
             frame = tkinter.Frame(screen.window, background=bg_color, highlightbackground=text_color, highlightthickness=1, width=square_size, height=square_size)
-            frame.pack_propagate(0)    
+            frame.pack_propagate(0)
             label = tkinter.Label(frame, bg=bg_color, fg=text_color, font=("Calibri", 24), text=square.letter)
             label.pack(expand=True)
             frame.place(x = column * (square_size + hor_square_margin) + hor_screen_edge, y = row * (square_size + ver_square_margin) + ver_screen_edge)
+    
+    frame = tkinter.Frame(screen.window, background="black", width=460, height=40)
+    frame.pack_propagate(0)
+    label = tkinter.Label(frame, bg="black", fg="white", font=("Calibri", 14), text=screen.caption)
+    label.pack(expand=True)
+    frame.place(x = 0, y = 540)
 
 
 def main():
