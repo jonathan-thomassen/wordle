@@ -179,17 +179,23 @@ def test_guess(guess: str, word: str) -> tuple[list[Status], int]:
             statuses[i] = Status.CORRECT
             letters[guess[i].upper()] = Status.CORRECT
             correct_letters += 1
-            temp_word = temp_word.replace(guess[i], "")
-        elif temp_word.count(guess[i]) > 0:
-            statuses[i] = Status.WRONG_PLACE
-            if letters[guess[i].upper()] != Status.CORRECT:
-                letters[guess[i].upper()] = Status.WRONG_PLACE
-            temp_word = temp_word.replace(guess[i], "")
+            temp_word = temp_word.replace(word[i], "", 1)
+    for i in range(5):
+        if word.count(guess[i]) > 0:
+            if statuses[i] != Status.CORRECT:
+                if guess[i] in temp_word:
+                    statuses[i] = Status.WRONG_PLACE
+                    if letters[guess[i].upper()] != Status.CORRECT:
+                        letters[guess[i].upper()] = Status.WRONG_PLACE
+                    temp_word = temp_word.replace(guess[i], "", 1)
+                else:
+                    statuses[i] = Status.INCORRECT
+                    if letters[guess[i].upper()] != Status.CORRECT and letters[guess[i].upper()] != Status.WRONG_PLACE:
+                        letters[guess[i].upper()] = Status.INCORRECT
         else:
             statuses[i] = Status.INCORRECT
-            if letters[guess[i].upper()] != Status.CORRECT or letters[guess[i].upper()] != Status.WRONG_PLACE:
+            if letters[guess[i].upper()] != Status.CORRECT and letters[guess[i].upper()] != Status.WRONG_PLACE:
                 letters[guess[i].upper()] = Status.INCORRECT
-            letters[guess[i].upper()] = Status.INCORRECT
         
     return statuses, correct_letters
 
