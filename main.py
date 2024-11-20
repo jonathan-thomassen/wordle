@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 from random import randrange
 from tkinter import *
+from unidecode import unidecode
 import sys
 import tkinter
 
@@ -42,46 +43,32 @@ class Square:
 
 dictionary: list[str]
 word: str
+letters: dict
     
 
 class Screen:
     def __init__(self):
         self.window = tkinter.Tk()
         self.window.bind("<KeyPress>", self.onKeyPress)
-        self.grid = [[Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()]]
-        self.caption = "Welcome! Start typing to begin"
-        for square in  self.grid[0]:
-            square.status = Status.NOT_TESTED
-        self.active_row = 0
-        self.active_column = 0
-        self.state = Game_State.IN_GAME
+        self.initiate_window()
  
     def onKeyPress(self, e):
         print("Key pressed:", e.char.upper(), e.keycode)
 
         if self.state == Game_State.OUT_OF_GAME:
-            self.grid = [[Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()],
-                     [Square(), Square(), Square(), Square(), Square()]]
-            self.caption = "Welcome! Start typing to begin"
-            for square in  self.grid[0]:
-                square.status = Status.NOT_TESTED
-            self.active_row = 0
-            self.active_column = 0
-            self.state = Game_State.IN_GAME
+            self.initiate_window()
+            new_word()
+            alphabet = "QWERTYUIOPASDFGHJKLZXCVBNM"
+            global letters
+            letters = {}
+            for letter in alphabet:
+                letters.update({letter:Status.NOT_TESTED})
             draw_grid(self)
         else:
             #Check if key pressed is in English alphabet:
-            if e.keycode >= 65 and e.keycode <= 90 and self.grid[self.active_row][self.active_column].letter == "":
-                self.grid[self.active_row][self.active_column].letter = e.char.upper()
+            if e.keycode >= 65 and e.keycode <= 90 and e.char.isalpha() and self.grid[self.active_row][self.active_column].letter == "":
+                #Use unidecode to strip out any accents
+                self.grid[self.active_row][self.active_column].letter = unidecode(e.char.upper())
                 if self.active_column <= 3:
                     self.active_column += 1
                 self.caption = "Guess #" + str(self.active_row + 1)
@@ -129,6 +116,20 @@ class Screen:
 
                     self.caption = "Word is not in word list. Try another word."
                 draw_grid(self)
+    
+    def initiate_window(self):
+        self.grid = [[Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()],
+                     [Square(), Square(), Square(), Square(), Square()]]
+        self.caption = "Welcome! Start typing to begin"
+        for square in  self.grid[0]:
+            square.status = Status.NOT_TESTED
+        self.active_row = 0
+        self.active_column = 0
+        self.state = Game_State.IN_GAME
 
 
 def read_args() -> Config:
@@ -170,15 +171,25 @@ def test_guess(guess: str, word: str) -> tuple[list[Status], int]:
     guess = guess.lower()
     statuses = [Status.NOT_TESTED] * 5
     correct_letters = 0
+    temp_word = word
 
+    global letters
     for i in range(5):
         if guess[i] == word[i]:
             statuses[i] = Status.CORRECT
+            letters[guess[i].upper()] = Status.CORRECT
             correct_letters += 1
-        elif word.count(guess[i]) > 0:
+            temp_word = temp_word.replace(guess[i], "")
+        elif temp_word.count(guess[i]) > 0:
             statuses[i] = Status.WRONG_PLACE
+            if letters[guess[i].upper()] != Status.CORRECT:
+                letters[guess[i].upper()] = Status.WRONG_PLACE
+            temp_word = temp_word.replace(guess[i], "")
         else:
             statuses[i] = Status.INCORRECT
+            if letters[guess[i].upper()] != Status.CORRECT or letters[guess[i].upper()] != Status.WRONG_PLACE:
+                letters[guess[i].upper()] = Status.INCORRECT
+            letters[guess[i].upper()] = Status.INCORRECT
         
     return statuses, correct_letters
 
@@ -210,25 +221,70 @@ def process_guess(word: str, guess_no: int) -> int:
 
     return correct_letters
 
+def new_word():
+    word_number = randrange((len(dictionary) - 1))
+    global word
+    word = dictionary[word_number]
+
 
 def run_game(config: Config):
     global dictionary 
     dictionary = read_list(config)
 
-    word_number = randrange((len(dictionary) - 1))
-    global word
-    word = dictionary[word_number]
+    alphabet = "QWERTYUIOPASDFGHJKLZXCVBNM"
+    global letters
+    letters = {}
+    for letter in alphabet:
+        letters.update({letter:Status.NOT_TESTED})
 
+    new_word()
+    
     screen = Screen()
     screen.window.title("Wordle Clone")
     screen.window.resizable(width=False, height=False)
-    screen.window.geometry("460x580")
+    screen.window.geometry("460x716")
     screen.window.configure(bg="black")
     draw_grid(screen)
 
     screen.window.mainloop()
     
     print("The word was: " + word)
+
+
+def get_letter_color(letter) -> str:
+    if letters[letter] == Status.CORRECT:
+        return "green"
+    elif letters[letter] == Status.INCORRECT:
+        return "red"
+    elif letters[letter] == Status.WRONG_PLACE:
+        return "yellow"
+    elif letters[letter] == Status.NOT_TESTED:
+        return "grey"
+
+
+def draw_keyboard(screen: Screen, start_y: int):
+    square_size = 36
+    font_size = 12
+    hor_screen_edge = 10
+    ver_screen_edge = 10
+    hor_square_margin = 8
+    ver_square_margin = 8
+    row_margin = 8
+
+    rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
+
+    def draw_row(row_no: int):
+        fg_color = get_letter_color(letter)
+
+        frame = tkinter.Frame(screen.window, background="black", highlightbackground=fg_color, highlightthickness=1, width=square_size, height=square_size)
+        frame.pack_propagate(0)
+        label = tkinter.Label(frame, bg="black", fg=fg_color, font=("Calibri", font_size), text=letter)
+        label.pack(expand=True)
+        frame.place(x = hor_screen_edge + i * (square_size + hor_square_margin) + row_no * row_margin, y = start_y + ver_screen_edge + row_no * (square_size + ver_square_margin))
+
+    for row_no in range(3):
+        for i, letter in enumerate(rows[row_no]):
+            draw_row(row_no)
 
 
 def draw_grid(screen: Screen):
@@ -271,6 +327,8 @@ def draw_grid(screen: Screen):
     label = tkinter.Label(frame, bg="black", fg="white", font=("Calibri", 14), text=screen.caption)
     label.pack(expand=True)
     frame.place(x = 0, y = 540)
+
+    draw_keyboard(screen, 570)
 
 
 def main():
