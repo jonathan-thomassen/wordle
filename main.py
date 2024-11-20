@@ -9,6 +9,8 @@ from tkinter import *
 from unidecode import unidecode
 import sys
 import tkinter
+import pygame
+import pygame.freetype
 
 
 @dataclass
@@ -48,8 +50,8 @@ letters: dict
 
 class Screen:
     def __init__(self):
-        self.window = tkinter.Tk()
-        self.window.bind("<KeyPress>", self.onKeyPress)
+        self.window = pygame.display.set_mode((460, 716))
+        # self.window.bind("<KeyPress>", self.onKeyPress)
         self.initiate_window()
  
     def onKeyPress(self, e):
@@ -244,12 +246,15 @@ def run_game(config: Config):
         letters.update({letter:Status.NOT_TESTED})
 
     new_word()
-    
+    pygame.init()
+
     screen = Screen()
-    screen.window.title("Wordle Clone")
-    screen.window.resizable(width=False, height=False)
-    screen.window.geometry("460x716")
-    screen.window.configure(bg="black")
+    clock = pygame.time.Clock()
+    running = True
+    # screen.window.title("Wordle Clone")
+    # screen.window.resizable(width=False, height=False)
+    # screen.window.geometry("460x716")
+    # screen.window.configure(bg="black")
     draw_grid(screen)
 
     screen.window.mainloop()
@@ -282,6 +287,8 @@ def draw_keyboard(screen: Screen, start_y: int):
     def draw_row(row_no: int):
         fg_color = get_letter_color(letter)
 
+    
+
         frame = tkinter.Frame(screen.window, background="black", highlightbackground=fg_color, highlightthickness=1, width=square_size, height=square_size)
         frame.pack_propagate(0)
         label = tkinter.Label(frame, bg="black", fg=fg_color, font=("Calibri", font_size), text=letter)
@@ -299,9 +306,10 @@ def draw_grid(screen: Screen):
     ver_screen_edge = 10
     hor_square_margin = 10
     ver_square_margin = 10
+    square_font = pygame.freetype.SysFont("Calibri", 24)
 
-    for child in screen.window.winfo_children():
-        child.destroy()
+    # for child in screen.window.winfo_children():
+    #     child.destroy()
 
     for row in range(6):
         for column in range(5):
@@ -322,19 +330,24 @@ def draw_grid(screen: Screen):
                 bg_color = "black"
                 text_color = "yellow"
 
-            frame = tkinter.Frame(screen.window, background=bg_color, highlightbackground=text_color, highlightthickness=1, width=square_size, height=square_size)
-            frame.pack_propagate(0)
-            label = tkinter.Label(frame, bg=bg_color, fg=text_color, font=("Calibri", 24), text=square.letter)
-            label.pack(expand=True)
-            frame.place(x = column * (square_size + hor_square_margin) + hor_screen_edge, y = row * (square_size + ver_square_margin) + ver_screen_edge)
-    
-    frame = tkinter.Frame(screen.window, background="black", width=460, height=40)
-    frame.pack_propagate(0)
-    label = tkinter.Label(frame, bg="black", fg="white", font=("Calibri", 14), text=screen.caption)
-    label.pack(expand=True)
-    frame.place(x = 0, y = 540)
+            square_rect = pygame.Rect(column * (square_size + hor_square_margin) + hor_screen_edge, row * (square_size + ver_square_margin) + ver_screen_edge, square_size, square_size)
+            pygame.draw.rect(screen.window, text_color, square_rect, 1)
+            text_surface, text_rect = square_font.render("L", text_color)
+            screen.window.blit(text_surface, (square_rect.left + square_rect.width / 2 - text_rect.width / 2, square_rect.top + square_rect.height / 2 - text_rect.height / 2))
+
+    label_font = pygame.freetype.SysFont("Calibri", 18)
+    text_surface, text_rect = label_font.render(screen.caption, "white")
+    screen.window.blit(text_surface, (0 + screen.window.get_width() / 2 - text_rect.width / 2, 550))
+
+    pygame.display.flip()
+
+    # label = tkinter.Label(frame, bg="black", fg="white", font=("Calibri", 14), text=screen.caption)
+    # label.pack(expand=True)
+    # frame.place(x = 0, y = 540)
 
     draw_keyboard(screen, 570)
+
+    pygame.display.flip()
 
 
 def main():
