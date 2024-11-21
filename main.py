@@ -45,11 +45,17 @@ class Square:
 
 
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+BASE_H = 1080
+WIN_W = 500
+WIN_H = 782
 
 
 class Screen:
     def __init__(self):
-        self.window = pygame.display.set_mode((690, 1074))
+        self.scale_mode: int
+        self.desktop_h = pygame.display.Info().current_h
+        self.scale = pygame.display.Info().current_h / BASE_H
+        self.window = pygame.display.set_mode((WIN_W * self.scale, WIN_H * self.scale))
         self.letters = {}
         for letter in ALPHABET:
             self.letters.update({letter:Status.NOT_TESTED})
@@ -113,7 +119,7 @@ def handleEvent(screen: Screen, event: pygame.event.Event):
                     i += 1
 
                 if correct_letter_amount == 5:
-                    screen.caption = "Congratulations! You won!"
+                    screen.caption = "Correct! You win!"
                     screen.state = Game_State.OUT_OF_GAME
                 elif screen.active_row <= 4:
                     screen.active_column = 0
@@ -190,6 +196,7 @@ def new_word(screen: Screen):
 
 def run_game():    
     pygame.init() # pylint: disable=no-member
+
     pygame.display.set_caption("Five-letter Word Game")
 
     screen = Screen()
@@ -218,24 +225,22 @@ def get_letter_color(screen: Screen, letter: str) -> str:
 
 
 def draw_keyboard(screen: Screen, start_y: int):
-    square_size = 56
-    font_size = 30
-    hor_screen_edge = 12
-    ver_screen_edge = 15
-    hor_square_margin = 12
-    ver_square_margin = 12
-    row_margin = 12
+    square_size = 42 * screen.scale
+    font_size = 18 * screen.scale
+    hor_screen_edge = 8 * screen.scale
+    hor_square_margin = 7 * screen.scale
+    ver_square_margin = 7 * screen.scale
+    row_margin = 8 * screen.scale
 
     rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
 
     def draw_character(row: int, column: int, letter: str):
         fg_color = get_letter_color(screen, letter)
-        square_font = pygame.freetype.SysFont("OCR-A Extended", font_size)
+        square_font = pygame.freetype.SysFont("Trebuchet MS", font_size)
 
         square_rect = pygame.Rect(
-            hor_screen_edge + column *
-            (square_size + hor_square_margin) + row * row_margin,
-            start_y + ver_screen_edge + row * (square_size + ver_square_margin),
+            hor_screen_edge + column * (square_size + hor_square_margin) + row * row_margin,
+            start_y + row * (square_size + ver_square_margin),
             square_size,
             square_size)
         pygame.draw.rect(screen.window, fg_color, square_rect, 1)
@@ -243,7 +248,7 @@ def draw_keyboard(screen: Screen, start_y: int):
         screen.window.blit(
             text_surface,
             (square_rect.left + square_rect.width / 2 - text_rect.width / 2,
-            square_rect.top + square_rect.height / 2 - text_rect.height / 2))
+             square_rect.top + square_rect.height / 2 - text_rect.height / 2))
 
     for row in range(3):
         for column, letter in enumerate(rows[row]):
@@ -251,12 +256,12 @@ def draw_keyboard(screen: Screen, start_y: int):
 
 
 def draw_grid(screen: Screen):
-    square_size = 120
-    hor_screen_edge = 15
-    ver_screen_edge = 15
-    hor_square_margin = 15
-    ver_square_margin = 15
-    square_font = pygame.freetype.SysFont("OCR-A Extended", 56)
+    square_size = 88 * screen.scale
+    screen_edge = 10 * screen.scale
+    hor_square_margin = 10 * screen.scale
+    ver_square_margin = 10 * screen.scale
+    font_size = 36 * screen.scale
+    square_font = pygame.freetype.SysFont("OCR-A Extended", font_size )
 
     screen.window.fill("black")
 
@@ -275,8 +280,8 @@ def draw_grid(screen: Screen):
                 text_color = "yellow"
 
             square_rect = pygame.Rect(
-                column * (square_size + hor_square_margin) + hor_screen_edge,
-                row * (square_size + ver_square_margin) + ver_screen_edge,
+                column * (square_size + hor_square_margin) + screen_edge,
+                row * (square_size + ver_square_margin) + screen_edge,
                 square_size,
                 square_size)
             pygame.draw.rect(screen.window, text_color, square_rect, 1)
@@ -286,13 +291,13 @@ def draw_grid(screen: Screen):
                 (square_rect.left + square_rect.width / 2 - text_rect.width / 2,
                  square_rect.top + square_rect.height / 2 - text_rect.height / 2))
 
-    label_font = pygame.freetype.SysFont("OCR-A Extended", 27)
+    label_font = pygame.freetype.SysFont("Lucida Console", 22 * screen.scale)
     text_surface, text_rect = label_font.render(screen.caption, "white")
     screen.window.blit(
         text_surface,
-        (0 + screen.window.get_width() / 2 - text_rect.width / 2, 831))
+        (0 + screen.window.get_width() / 2 - text_rect.width / 2, 600 * screen.scale))
 
-    draw_keyboard(screen, 855)
+    draw_keyboard(screen, 634 * screen.scale)
 
     pygame.display.flip()
 
