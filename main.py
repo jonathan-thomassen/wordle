@@ -1,9 +1,7 @@
 """Wordle application."""
 
 
-from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from random import randrange
 import ctypes
 
@@ -13,9 +11,16 @@ import pygame.freetype
 import words
 
 
-@dataclass
-class Config:
-    list_path: Path
+ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+BASE_H = 1080
+WIN_W = 500
+WIN_H = 782
+BG_COLOR = "black"
+INACTIVE_COLOR = "grey"
+NOT_TESTED_COLOR = "white"
+INCORRECT_COLOR = "red"
+WRONG_PLACE_COLOR = "yellow"
+CORRECT_COLOR = "green"
 
 
 class Status(Enum):
@@ -42,12 +47,6 @@ class Square:
     def __init__(self):
         self.status = Status.INACTIVE
         self.letter = ""
-
-
-ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-BASE_H = 1080
-WIN_W = 500
-WIN_H = 782
 
 
 class Screen:
@@ -77,7 +76,7 @@ class Screen:
         self.state = Game_State.IN_GAME
 
 
-def handleEvent(screen: Screen, event: pygame.event.Event):
+def handle_event(screen: Screen, event: pygame.event.Event):
     if screen.state == Game_State.OUT_OF_GAME:
         screen.initiate_window()
         new_word(screen)
@@ -189,39 +188,15 @@ def test_guess(screen: Screen, guess: str) -> tuple[list[Status], int]:
     return statuses, correct_letters
 
 
-def new_word(screen: Screen):
-    word_number = randrange((len(words.WORDS) - 1))
-    screen.word = words.WORDS[word_number]
-
-
-def run_game():    
-    pygame.init() # pylint: disable=no-member
-
-    pygame.display.set_caption("Five-letter Word Game")
-
-    screen = Screen()
-    clock = pygame.time.Clock()
-    new_word(screen)
-    running = True
-    draw_grid(screen)
-    while running:
-        for event in pygame.event.get(eventtype=pygame.KEYDOWN): # pylint: disable=no-member
-            handleEvent(screen, event)
-        for event in pygame.event.get(eventtype=pygame.QUIT): # pylint: disable=no-member
-            running = False
-
-        clock.tick(60)
-
-
 def get_letter_color(screen: Screen, letter: str) -> str:
     if screen.letters[letter] == Status.CORRECT:
-        return "green"
+        return CORRECT_COLOR
     if screen.letters[letter] == Status.INCORRECT:
-        return "red"
+        return INCORRECT_COLOR
     if screen.letters[letter] == Status.WRONG_PLACE:
-        return "yellow"
+        return WRONG_PLACE_COLOR
     if screen.letters[letter] == Status.NOT_TESTED:
-        return "grey"
+        return NOT_TESTED_COLOR
 
 
 def draw_keyboard(screen: Screen, start_y: int):
@@ -263,21 +238,21 @@ def draw_grid(screen: Screen):
     font_size = 36 * screen.scale
     square_font = pygame.freetype.SysFont("OCR-A Extended", font_size )
 
-    screen.window.fill("black")
+    screen.window.fill(BG_COLOR)
 
     for row in range(6):
         for column in range(5):
             square = screen.grid[row][column]
-            text_color = "grey"
+            text_color = INACTIVE_COLOR
 
             if square.status == Status.NOT_TESTED:
-                text_color = "white"
+                text_color = NOT_TESTED_COLOR
             elif square.status == Status.INCORRECT:
-                text_color = "red"
+                text_color = INCORRECT_COLOR
             elif square.status == Status.CORRECT:
-                text_color = "green"
+                text_color = CORRECT_COLOR
             elif square.status == Status.WRONG_PLACE:
-                text_color = "yellow"
+                text_color = WRONG_PLACE_COLOR
 
             square_rect = pygame.Rect(
                 column * (square_size + hor_square_margin) + screen_edge,
@@ -285,14 +260,14 @@ def draw_grid(screen: Screen):
                 square_size,
                 square_size)
             pygame.draw.rect(screen.window, text_color, square_rect, 1)
-            text_surface, text_rect = square_font.render(square.letter, text_color, "black")
+            text_surface, text_rect = square_font.render(square.letter, text_color, BG_COLOR)
             screen.window.blit(
                 text_surface,
                 (square_rect.left + square_rect.width / 2 - text_rect.width / 2,
                  square_rect.top + square_rect.height / 2 - text_rect.height / 2))
 
     label_font = pygame.freetype.SysFont("Lucida Console", 22 * screen.scale)
-    text_surface, text_rect = label_font.render(screen.caption, "white")
+    text_surface, text_rect = label_font.render(screen.caption, NOT_TESTED_COLOR)
     screen.window.blit(
         text_surface,
         (0 + screen.window.get_width() / 2 - text_rect.width / 2, 600 * screen.scale))
@@ -302,9 +277,31 @@ def draw_grid(screen: Screen):
     pygame.display.flip()
 
 
+def new_word(screen: Screen):
+    word_number = randrange((len(words.WORDS) - 1))
+    screen.word = words.WORDS[word_number]
+
+
+def run_game():    
+    pygame.init() # pylint: disable=no-member
+    pygame.display.set_caption("Five-letter Word Game")
+
+    screen = Screen()
+    clock = pygame.time.Clock()
+    new_word(screen)
+    running = True
+    draw_grid(screen)
+    while running:
+        for event in pygame.event.get(eventtype=pygame.KEYDOWN): # pylint: disable=no-member
+            handle_event(screen, event)
+        for event in pygame.event.get(eventtype=pygame.QUIT): # pylint: disable=no-member
+            running = False
+
+        clock.tick(60)
+
+
 def main():
     ctypes.windll.user32.SetProcessDPIAware()
-
     run_game()
 
 
