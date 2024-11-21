@@ -5,12 +5,12 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from random import randrange
-from tkinter import *
-from unidecode import unidecode
-import sys
-import tkinter
-import pygame
+import ctypes
+
+import pygame # pylint: disable=import-error
 import pygame.freetype
+
+import words
 
 
 @dataclass
@@ -32,6 +32,7 @@ class Validation_State(Enum):
     NOT_IN_DICTIONARY = 2
     VALID = 3
 
+
 class Game_State(Enum):
     IN_GAME = 0
     OUT_OF_GAME = 1
@@ -43,82 +44,18 @@ class Square:
         self.letter = ""
 
 
-dictionary: list[str]
-word: str
-letters: dict
-    
+ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 
 class Screen:
     def __init__(self):
-        self.window = pygame.display.set_mode((460, 716))
-        # self.window.bind("<KeyPress>", self.onKeyPress)
+        self.window = pygame.display.set_mode((920, 1432))
+        self.letters = {}
+        for letter in ALPHABET:
+            self.letters.update({letter:Status.NOT_TESTED})
+        self.word = ""
         self.initiate_window()
- 
-    def onKeyPress(self, e):
-        print("Key pressed:", e.char.upper(), e.keycode)
 
-        if self.state == Game_State.OUT_OF_GAME:
-            self.initiate_window()
-            new_word()
-            alphabet = "QWERTYUIOPASDFGHJKLZXCVBNM"
-            global letters
-            letters = {}
-            for letter in alphabet:
-                letters.update({letter:Status.NOT_TESTED})
-            draw_grid(self)
-        else:
-            #Check if key pressed is in English alphabet:
-            if e.keycode >= 65 and e.keycode <= 90 and e.char.isalpha() and self.grid[self.active_row][self.active_column].letter == "":
-                #Use unidecode to strip out any accents
-                self.grid[self.active_row][self.active_column].letter = unidecode(e.char.upper())
-                if self.active_column <= 3:
-                    self.active_column += 1
-                self.caption = "Guess #" + str(self.active_row + 1)
-                draw_grid(self)
-            #Check for backspace:
-            elif e.keycode == 8:
-                if self.active_column >= 1 and self.grid[self.active_row][self.active_column].letter == "":
-                    self.active_column -= 1
-                self.grid[self.active_row][self.active_column].letter = ""
-                self.caption = "Guess #" + str(self.active_row + 1)
-                draw_grid(self)
-            #Check for enter:
-            elif e.keycode == 13 and self.grid[self.active_row][self.active_column].letter != "":
-                guess: str = ""
-                for square in self.grid[self.active_row]:
-                    guess += square.letter
-                validation_state = guess_validation(guess)
-                if validation_state == Validation_State.VALID:
-                    statuses, correct_letter_amount = test_guess(guess, word)
-
-                    i = 0
-                    for square in self.grid[self.active_row]:
-                        square.status = statuses[i]
-                        i += 1
-
-                    if correct_letter_amount == 5:
-                        self.caption = "Congratulations! You won!"
-                        self.state = Game_State.OUT_OF_GAME
-                    elif self.active_row <= 4:
-                        self.active_column = 0
-                        self.active_row += 1
-
-                        for square in self.grid[self.active_row]:
-                            square.status = Status.NOT_TESTED  
-                        self.caption = "Guess #" + str(self.active_row + 1)
-                    else:
-                        self.caption = "You lost! The word was: " + word.upper()
-                        self.state = Game_State.OUT_OF_GAME
-                elif validation_state == Validation_State.NOT_IN_DICTIONARY:
-                    for square in self.grid[self.active_row]:
-                        square.letter = ""
-                        square.status = Status.NOT_TESTED
-
-                    self.active_column = 0
-
-                    self.caption = "Word is not in word list. Try another word."
-                draw_grid(self)
-    
     def initiate_window(self):
         self.grid = [[Square(), Square(), Square(), Square(), Square()],
                      [Square(), Square(), Square(), Square(), Square()],
@@ -134,227 +71,232 @@ class Screen:
         self.state = Game_State.IN_GAME
 
 
-def read_args() -> Config:
-    if len(sys.argv) > 1:
-        list_path = Path(sys.argv[1])
-        return Config(list_path)
+def handleEvent(screen: Screen, event: pygame.event.Event):
+    if screen.state == Game_State.OUT_OF_GAME:
+        screen.initiate_window()
+        new_word(screen)
+        screen.letters = {}
+        for letter in ALPHABET:
+            screen.letters.update({letter:Status.NOT_TESTED})
+        draw_grid(screen)
     else:
-        print("Error: First argument must be a valid path to a list of English words.")
+        #Check if key pressed is in English alphabet:
+        if event.scancode >= 4 and \
+           event.scancode <= 29 and \
+           screen.grid[screen.active_row][screen.active_column].letter == "":
+            screen.grid[screen.active_row][screen.active_column].letter = ALPHABET[event.scancode-4]
+            if screen.active_column <= 3:
+                screen.active_column += 1
+            screen.caption = "Guess #" + str(screen.active_row + 1)
+            draw_grid(screen)
+        #Check for backspace:
+        elif event.key == pygame.K_BACKSPACE:
+            if screen.active_column >= 1 and \
+               screen.grid[screen.active_row][screen.active_column].letter == "":
+                screen.active_column -= 1
+            screen.grid[screen.active_row][screen.active_column].letter = ""
+            screen.caption = "Guess #" + str(screen.active_row + 1)
+            draw_grid(screen)
+        #Check for enter:
+        elif event.key == pygame.K_RETURN and \
+             screen.grid[screen.active_row][screen.active_column].letter != "":
+            guess: str = ""
+            for square in screen.grid[screen.active_row]:
+                guess += square.letter
+            validation_state = guess_validation(guess)
+            if validation_state == Validation_State.VALID:
+                statuses, correct_letter_amount = test_guess(screen, guess)
 
+                i = 0
+                for square in screen.grid[screen.active_row]:
+                    square.status = statuses[i]
+                    i += 1
 
-def read_list(config: Config) -> list[str]:
-    words: list[str]
-    with open(config.list_path, encoding="utf-8") as list_file:
-        words = [line.strip() for line in list_file]
-    return words
+                if correct_letter_amount == 5:
+                    screen.caption = "Congratulations! You won!"
+                    screen.state = Game_State.OUT_OF_GAME
+                elif screen.active_row <= 4:
+                    screen.active_column = 0
+                    screen.active_row += 1
+
+                    for square in screen.grid[screen.active_row]:
+                        square.status = Status.NOT_TESTED
+                    screen.caption = "Guess #" + str(screen.active_row + 1)
+                else:
+                    screen.caption = "You lost! The word was: " + screen.word.upper()
+                    screen.state = Game_State.OUT_OF_GAME
+            elif validation_state == Validation_State.NOT_IN_DICTIONARY:
+                for square in screen.grid[screen.active_row]:
+                    square.letter = ""
+                    square.status = Status.NOT_TESTED
+
+                screen.active_column = 0
+
+                screen.caption = "Word is not in word list. Try another word."
+            draw_grid(screen)
 
 
 def check_dictionary(guess: str) -> bool:
-    if guess.lower() in dictionary:
+    if guess.lower() in words.WORDS:
         return True
     return False
 
 
 def guess_validation(guess: str) -> Validation_State:
-    if len(guess) > 5:
-        print("Length of word is too long, word must be five letters.")
-        return Validation_State.TOO_LONG
-    if len(guess) < 5:
-        print("Length of word is too short, word must be five letters.")
-        return Validation_State.TOO_SHORT
     if not check_dictionary(guess):
-        print("Word is not in dictionary. Please try a different word.")
         return Validation_State.NOT_IN_DICTIONARY
-    
+
     return Validation_State.VALID
 
 
-def test_guess(guess: str, word: str) -> tuple[list[Status], int]:
+def test_guess(screen: Screen, guess: str) -> tuple[list[Status], int]:
     guess = guess.lower()
     statuses = [Status.NOT_TESTED] * 5
     correct_letters = 0
-    temp_word = word
+    temp_word = screen.word
 
-    global letters
     for i in range(5):
-        if guess[i] == word[i]:
+        if guess[i] == screen.word[i]:
             statuses[i] = Status.CORRECT
-            letters[guess[i].upper()] = Status.CORRECT
+            screen.letters[guess[i].upper()] = Status.CORRECT
             correct_letters += 1
-            temp_word = temp_word.replace(word[i], "", 1)
+            temp_word = temp_word.replace(screen.word[i], "", 1)
     for i in range(5):
-        if word.count(guess[i]) > 0:
+        if screen.word.count(guess[i]) > 0:
             if statuses[i] != Status.CORRECT:
                 if guess[i] in temp_word:
                     statuses[i] = Status.WRONG_PLACE
-                    if letters[guess[i].upper()] != Status.CORRECT:
-                        letters[guess[i].upper()] = Status.WRONG_PLACE
+                    if screen.letters[guess[i].upper()] != Status.CORRECT:
+                        screen.letters[guess[i].upper()] = Status.WRONG_PLACE
                     temp_word = temp_word.replace(guess[i], "", 1)
                 else:
                     statuses[i] = Status.INCORRECT
-                    if letters[guess[i].upper()] != Status.CORRECT and letters[guess[i].upper()] != Status.WRONG_PLACE:
-                        letters[guess[i].upper()] = Status.INCORRECT
+                    if screen.letters[guess[i].upper()] != Status.CORRECT and \
+                       screen.letters[guess[i].upper()] != Status.WRONG_PLACE:
+                        screen.letters[guess[i].upper()] = Status.INCORRECT
         else:
             statuses[i] = Status.INCORRECT
-            if letters[guess[i].upper()] != Status.CORRECT and letters[guess[i].upper()] != Status.WRONG_PLACE:
-                letters[guess[i].upper()] = Status.INCORRECT
-        
+            if screen.letters[guess[i].upper()] != Status.CORRECT and \
+               screen.letters[guess[i].upper()] != Status.WRONG_PLACE:
+                screen.letters[guess[i].upper()] = Status.INCORRECT
+
     return statuses, correct_letters
 
 
-def print_result(statuses, correct_letters, guess):
-    i = 0    
-    for status in statuses:
-        print(guess[i] + " is " + str(status))
-        i += 1
-
-    if correct_letters == 5:
-        print("Correct! You win!")
+def new_word(screen: Screen):
+    word_number = randrange((len(words.WORDS) - 1))
+    screen.word = words.WORDS[word_number]
 
 
-def process_guess(word: str, guess_no: int) -> int:
-    print("Guess #" + str(guess_no) + ":")
-    guess = input().lower()
-
-    while not guess_validation(guess):
-        print("Guess #" + str(guess_no) + ":")
-        guess = input()
-
-    if guess == "igiveup":
-        return 5
-    
-    statuses, correct_letters = test_guess(guess, word)
-
-    print_result(statuses, correct_letters, guess)
-
-    return correct_letters
-
-def new_word():
-    word_number = randrange((len(dictionary) - 1))
-    global word
-    word = dictionary[word_number]
-
-
-def run_game(config: Config):
-    global dictionary 
-    dictionary = read_list(config)
-
-    alphabet = "QWERTYUIOPASDFGHJKLZXCVBNM"
-    global letters
-    letters = {}
-    for letter in alphabet:
-        letters.update({letter:Status.NOT_TESTED})
-
-    new_word()
+def run_game():    
     pygame.init()
 
     screen = Screen()
-    clock = pygame.time.Clock()
+    new_word(screen)
     running = True
-    # screen.window.title("Wordle Clone")
-    # screen.window.resizable(width=False, height=False)
-    # screen.window.geometry("460x716")
-    # screen.window.configure(bg="black")
     draw_grid(screen)
+    while running:
+        for event in pygame.event.get(eventtype=pygame.KEYDOWN):
+            handleEvent(screen, event)
+        for event in pygame.event.get(eventtype=pygame.QUIT):
+            running = False
 
-    screen.window.mainloop()
-    
-    print("The word was: " + word)
 
-
-def get_letter_color(letter) -> str:
-    if letters[letter] == Status.CORRECT:
+def get_letter_color(screen: Screen, letter: str) -> str:
+    if screen.letters[letter] == Status.CORRECT:
         return "green"
-    elif letters[letter] == Status.INCORRECT:
+    if screen.letters[letter] == Status.INCORRECT:
         return "red"
-    elif letters[letter] == Status.WRONG_PLACE:
+    if screen.letters[letter] == Status.WRONG_PLACE:
         return "yellow"
-    elif letters[letter] == Status.NOT_TESTED:
+    if screen.letters[letter] == Status.NOT_TESTED:
         return "grey"
 
 
 def draw_keyboard(screen: Screen, start_y: int):
-    square_size = 36
-    font_size = 12
-    hor_screen_edge = 10
-    ver_screen_edge = 10
-    hor_square_margin = 8
-    ver_square_margin = 8
-    row_margin = 8
+    square_size = 72
+    font_size = 24
+    hor_screen_edge = 20
+    ver_screen_edge = 20
+    hor_square_margin = 16
+    ver_square_margin = 16
+    row_margin = 16
 
     rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
 
-    def draw_row(row_no: int):
-        fg_color = get_letter_color(letter)
+    def draw_character(row: int, column: int, letter: str):
+        fg_color = get_letter_color(screen, letter)
+        square_font = pygame.freetype.SysFont("Calibri", font_size)
 
-    
+        square_rect = pygame.Rect(
+            hor_screen_edge + column *
+            (square_size + hor_square_margin) + row * row_margin,
+            start_y + ver_screen_edge + row * (square_size + ver_square_margin),
+            square_size,
+            square_size)
+        pygame.draw.rect(screen.window, fg_color, square_rect, 1)
+        text_surface, text_rect = square_font.render(letter, fg_color)
+        screen.window.blit(
+            text_surface,
+            (square_rect.left + square_rect.width / 2 - text_rect.width / 2,
+            square_rect.top + square_rect.height / 2 - text_rect.height / 2))
 
-        frame = tkinter.Frame(screen.window, background="black", highlightbackground=fg_color, highlightthickness=1, width=square_size, height=square_size)
-        frame.pack_propagate(0)
-        label = tkinter.Label(frame, bg="black", fg=fg_color, font=("Calibri", font_size), text=letter)
-        label.pack(expand=True)
-        frame.place(x = hor_screen_edge + i * (square_size + hor_square_margin) + row_no * row_margin, y = start_y + ver_screen_edge + row_no * (square_size + ver_square_margin))
-
-    for row_no in range(3):
-        for i, letter in enumerate(rows[row_no]):
-            draw_row(row_no)
+    for row in range(3):
+        for column, letter in enumerate(rows[row]):
+            draw_character(row, column, letter)
 
 
 def draw_grid(screen: Screen):
-    square_size = 80
-    hor_screen_edge = 10
-    ver_screen_edge = 10
-    hor_square_margin = 10
-    ver_square_margin = 10
-    square_font = pygame.freetype.SysFont("Calibri", 24)
+    square_size = 160
+    hor_screen_edge = 20
+    ver_screen_edge = 20
+    hor_square_margin = 20
+    ver_square_margin = 20
+    square_font = pygame.freetype.SysFont("Calibri", 48)
 
-    # for child in screen.window.winfo_children():
-    #     child.destroy()
+    screen.window.fill("black")
 
     for row in range(6):
         for column in range(5):
             square = screen.grid[row][column]
-            if square.status == Status.INACTIVE:
-                bg_color = "black"
-                text_color = "grey"
-            elif square.status == Status.NOT_TESTED:
-                bg_color = "black"
+            text_color = "grey"
+
+            if square.status == Status.NOT_TESTED:
                 text_color = "white"
             elif square.status == Status.INCORRECT:
-                bg_color = "black"
                 text_color = "red"
             elif square.status == Status.CORRECT:
-                bg_color = "black"
                 text_color = "green"
             elif square.status == Status.WRONG_PLACE:
-                bg_color = "black"
                 text_color = "yellow"
 
-            square_rect = pygame.Rect(column * (square_size + hor_square_margin) + hor_screen_edge, row * (square_size + ver_square_margin) + ver_screen_edge, square_size, square_size)
+            square_rect = pygame.Rect(
+                column * (square_size + hor_square_margin) + hor_screen_edge,
+                row * (square_size + ver_square_margin) + ver_screen_edge,
+                square_size,
+                square_size)
             pygame.draw.rect(screen.window, text_color, square_rect, 1)
-            text_surface, text_rect = square_font.render("L", text_color)
-            screen.window.blit(text_surface, (square_rect.left + square_rect.width / 2 - text_rect.width / 2, square_rect.top + square_rect.height / 2 - text_rect.height / 2))
+            text_surface, text_rect = square_font.render(square.letter, text_color)
+            screen.window.blit(
+                text_surface,
+                (square_rect.left + square_rect.width / 2 - text_rect.width / 2,
+                 square_rect.top + square_rect.height / 2 - text_rect.height / 2))
 
-    label_font = pygame.freetype.SysFont("Calibri", 18)
+    label_font = pygame.freetype.SysFont("Calibri", 36)
     text_surface, text_rect = label_font.render(screen.caption, "white")
-    screen.window.blit(text_surface, (0 + screen.window.get_width() / 2 - text_rect.width / 2, 550))
+    screen.window.blit(
+        text_surface,
+        (0 + screen.window.get_width() / 2 - text_rect.width / 2, 1100))
 
-    pygame.display.flip()
-
-    # label = tkinter.Label(frame, bg="black", fg="white", font=("Calibri", 14), text=screen.caption)
-    # label.pack(expand=True)
-    # frame.place(x = 0, y = 540)
-
-    draw_keyboard(screen, 570)
+    draw_keyboard(screen, 1140)
 
     pygame.display.flip()
 
 
 def main():
-    config = read_args()
+    ctypes.windll.user32.SetProcessDPIAware()
 
-    if config is not None:
-        run_game(config)
+    run_game()
 
 
 if __name__ == "__main__":
