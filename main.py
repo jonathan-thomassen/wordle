@@ -7,7 +7,7 @@ from pathlib import Path
 from random import randrange
 import ctypes
 
-import pygame # pylint: disable=import-error
+import pygame
 import pygame.freetype
 
 import words
@@ -49,7 +49,7 @@ ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 class Screen:
     def __init__(self):
-        self.window = pygame.display.set_mode((920, 1432))
+        self.window = pygame.display.set_mode((690, 1074))
         self.letters = {}
         for letter in ALPHABET:
             self.letters.update({letter:Status.NOT_TESTED})
@@ -63,7 +63,7 @@ class Screen:
                      [Square(), Square(), Square(), Square(), Square()],
                      [Square(), Square(), Square(), Square(), Square()],
                      [Square(), Square(), Square(), Square(), Square()]]
-        self.caption = "Welcome! Start typing to begin"
+        self.caption = "Start typing to begin"
         for square in  self.grid[0]:
             square.status = Status.NOT_TESTED
         self.active_row = 0
@@ -90,7 +90,7 @@ def handleEvent(screen: Screen, event: pygame.event.Event):
             screen.caption = "Guess #" + str(screen.active_row + 1)
             draw_grid(screen)
         #Check for backspace:
-        elif event.key == pygame.K_BACKSPACE:
+        elif event.key == pygame.K_BACKSPACE: # pylint: disable=no-member
             if screen.active_column >= 1 and \
                screen.grid[screen.active_row][screen.active_column].letter == "":
                 screen.active_column -= 1
@@ -99,7 +99,7 @@ def handleEvent(screen: Screen, event: pygame.event.Event):
             draw_grid(screen)
         #Check for enter:
         elif event.key == pygame.K_RETURN and \
-             screen.grid[screen.active_row][screen.active_column].letter != "":
+             screen.grid[screen.active_row][screen.active_column].letter != "": # pylint: disable=no-member
             guess: str = ""
             for square in screen.grid[screen.active_row]:
                 guess += square.letter
@@ -132,7 +132,7 @@ def handleEvent(screen: Screen, event: pygame.event.Event):
 
                 screen.active_column = 0
 
-                screen.caption = "Word is not in word list. Try another word."
+                screen.caption = "Word not in dictionary. Try again"
             draw_grid(screen)
 
 
@@ -189,17 +189,21 @@ def new_word(screen: Screen):
 
 
 def run_game():    
-    pygame.init()
+    pygame.init() # pylint: disable=no-member
+    pygame.display.set_caption("Five-letter Word Game")
 
     screen = Screen()
+    clock = pygame.time.Clock()
     new_word(screen)
     running = True
     draw_grid(screen)
     while running:
-        for event in pygame.event.get(eventtype=pygame.KEYDOWN):
+        for event in pygame.event.get(eventtype=pygame.KEYDOWN): # pylint: disable=no-member
             handleEvent(screen, event)
-        for event in pygame.event.get(eventtype=pygame.QUIT):
+        for event in pygame.event.get(eventtype=pygame.QUIT): # pylint: disable=no-member
             running = False
+
+        clock.tick(60)
 
 
 def get_letter_color(screen: Screen, letter: str) -> str:
@@ -214,19 +218,19 @@ def get_letter_color(screen: Screen, letter: str) -> str:
 
 
 def draw_keyboard(screen: Screen, start_y: int):
-    square_size = 72
-    font_size = 24
-    hor_screen_edge = 20
-    ver_screen_edge = 20
-    hor_square_margin = 16
-    ver_square_margin = 16
-    row_margin = 16
+    square_size = 56
+    font_size = 30
+    hor_screen_edge = 12
+    ver_screen_edge = 15
+    hor_square_margin = 12
+    ver_square_margin = 12
+    row_margin = 12
 
     rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
 
     def draw_character(row: int, column: int, letter: str):
         fg_color = get_letter_color(screen, letter)
-        square_font = pygame.freetype.SysFont("Calibri", font_size)
+        square_font = pygame.freetype.SysFont("OCR-A Extended", font_size)
 
         square_rect = pygame.Rect(
             hor_screen_edge + column *
@@ -247,12 +251,12 @@ def draw_keyboard(screen: Screen, start_y: int):
 
 
 def draw_grid(screen: Screen):
-    square_size = 160
-    hor_screen_edge = 20
-    ver_screen_edge = 20
-    hor_square_margin = 20
-    ver_square_margin = 20
-    square_font = pygame.freetype.SysFont("Calibri", 48)
+    square_size = 120
+    hor_screen_edge = 15
+    ver_screen_edge = 15
+    hor_square_margin = 15
+    ver_square_margin = 15
+    square_font = pygame.freetype.SysFont("OCR-A Extended", 56)
 
     screen.window.fill("black")
 
@@ -276,19 +280,19 @@ def draw_grid(screen: Screen):
                 square_size,
                 square_size)
             pygame.draw.rect(screen.window, text_color, square_rect, 1)
-            text_surface, text_rect = square_font.render(square.letter, text_color)
+            text_surface, text_rect = square_font.render(square.letter, text_color, "black")
             screen.window.blit(
                 text_surface,
                 (square_rect.left + square_rect.width / 2 - text_rect.width / 2,
                  square_rect.top + square_rect.height / 2 - text_rect.height / 2))
 
-    label_font = pygame.freetype.SysFont("Calibri", 36)
+    label_font = pygame.freetype.SysFont("OCR-A Extended", 27)
     text_surface, text_rect = label_font.render(screen.caption, "white")
     screen.window.blit(
         text_surface,
-        (0 + screen.window.get_width() / 2 - text_rect.width / 2, 1100))
+        (0 + screen.window.get_width() / 2 - text_rect.width / 2, 831))
 
-    draw_keyboard(screen, 1140)
+    draw_keyboard(screen, 855)
 
     pygame.display.flip()
 
